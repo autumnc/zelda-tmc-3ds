@@ -23,7 +23,7 @@ https://discord.gg/SMW49UMkw
 ## Features
 
 * Native Nintendo 3DS port with full dual-screen support.
-* Supports both USA and European ROMs with automatic region detection.
+* Supports USA and European ROMs with automatic region detection, plus experimental JP support.
 * True widescreen gameplay on the 400x240 top screen, plus Original and Stretch display modes.
 * Bottom-screen interface with live map, dungeon information, quest status, touch item controls, and settings.
 * New 3DS enhancements including 804 MHz mode, L2 cache, multi-core rendering, and optional 2x–5x turbo using the C-Stick.
@@ -58,7 +58,7 @@ tmc-3ds-v1.3-E6.cia
 sdmc:/3ds/The Minish Cap 3DS/
 ```
 
-3. Place your legally obtained USA or European `.gba` ROM inside that folder.
+3. Place your legally obtained USA, European, or Japanese `.gba` ROM inside that folder.
 
 The ROM can have **any filename** as long as it uses the `.gba` extension.
 
@@ -75,9 +75,14 @@ The European ROM also includes multiple languages, **including English**, so the
 Expected clean ROM SHA-1 values:
 
 ```text
-USA:    b4bd50e4131b027c334547b4524e2dbbd4227130
-Europe: cff199b36ff173fb6faf152653d1bccf87c26fb7
+USA:         b4bd50e4131b027c334547b4524e2dbbd4227130
+Europe:      cff199b36ff173fb6faf152653d1bccf87c26fb7
+Japan:       6c5404a1effb17f481f352181d0f1c61a2765c5d
+JP Chinese:  ba04cfbe93d12d2ad684c52234472fa12a5b53d7
 ```
+
+The JP Chinese hash above is a known BZMJ-based fan translation. It uses the
+experimental JP path; Chinese font/layout fidelity still needs in-game testing.
 
 The ROM stays on your SD card and is never included in the CIA.
 

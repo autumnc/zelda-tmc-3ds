@@ -9,6 +9,24 @@
 extern u8* gRomData;
 extern u32 gRomSize;
 
+/*
+ * Fan-translation ROM variant, orthogonal to the retail region. The BZMJ and
+ * BZMP retail bases each have an in-place Chinese fan translation that keeps
+ * the region's game code and core data tables at retail offsets but patches
+ * the text pipeline (GetCharacter semantics, glyph-lookup stride, and a
+ * relocated font-bank table) and installs CJK glyph banks. Detected from the
+ * patched font-base literal; see Port_DetectRomRegion.
+ */
+typedef enum {
+    ROM_VARIANT_REGULAR,     /* retail USA/EU/JP */
+    ROM_VARIANT_JP_CHINESE,  /* BZMJ Chinese fan translation */
+    ROM_VARIANT_EU_CHINESE,  /* BZMP Chinese fan translation */
+} RomVariant;
+
+/* Current loaded-ROM variant. REGULAR for any unpatched retail ROM. Set during
+ * Port_LoadRom, before any message text is decoded. */
+RomVariant Port_GetRomVariant(void);
+
 #ifdef PC_PORT
 /*
  * Host-pointer plausibility guard: reject NULL,

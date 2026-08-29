@@ -305,10 +305,25 @@ u32 GetCharacter(Token* token) {
                         code = 9;
                         break;
                     case 0x10:
+#ifdef PC_PORT
+                        /* EU code-4 dispatch is shifted one vs USA/JP: EU
+                         * sub 0x00-0x10 -> code 9, 0x11 -> read+10. */
+                        if (REGION_IS_EU) {
+                            code = 9;
+                            break;
+                        }
+#endif
                         uVar6 = sub_0805EF8C(token);
                         code = 10;
                         break;
                     case 0x11:
+#ifdef PC_PORT
+                        if (REGION_IS_EU) {
+                            uVar6 = sub_0805EF8C(token);
+                            code = 10;
+                            break;
+                        }
+#endif
                         code = 2;
                         break;
                     case 0x12:
@@ -381,25 +396,89 @@ u32 GetCharacter(Token* token) {
                 code = 1;
                 break;
             case 0xb:
+#ifdef PC_PORT
+                /* JP GetCharacter: 0x0B-0x0E select banks 4-7 from the code
+                 * value itself ((code & 7) + 1), single-byte char OR'd in. */
+                if (REGION_IS_JP) {
+                    code = ((code & 7) + 1) << 8;
+                    code |= sub_0805EF8C(token);
+                    break;
+                }
+#endif
                 code = sub_0805EF8C(token);
                 code |= 0x400;
                 break;
             case 0xc:
+#ifdef PC_PORT
+                if (REGION_IS_JP) {
+                    code = ((code & 7) + 1) << 8;
+                    code |= sub_0805EF8C(token);
+                    break;
+                }
+#endif
                 code = sub_0805EF8C(token);
                 code |= 0x700;
                 break;
             case 0xd:
+#ifdef PC_PORT
+                if (REGION_IS_JP) {
+                    code = ((code & 7) + 1) << 8;
+                    code |= sub_0805EF8C(token);
+                    break;
+                }
+#endif
                 code = sub_0805EF8C(token);
                 code |= 0x500;
                 break;
             case 0xe:
+#ifdef PC_PORT
+                if (REGION_IS_JP) {
+                    code = ((code & 7) + 1) << 8;
+                    code |= sub_0805EF8C(token);
+                    break;
+                }
+#endif
                 code = sub_0805EF8C(token);
                 code |= 0x600;
                 break;
             case 0xf:
+#ifdef PC_PORT
+                /* JP GetCharacter 0x0F: byte<=0x2F -> bank 2, 0x30-0x3F ->
+                 * bank 3, >0x3F -> banks 9-24 via second byte. */
+                if (REGION_IS_JP) {
+                    code = sub_0805EF8C(token);
+                    if (code <= 0x2f) {
+                        code |= 0x200;
+                    } else if (code <= 0x3f) {
+                        code &= 0xf;
+                        code |= 0x300;
+                    } else {
+                        code = ((code & 0xf) + 9) << 8;
+                        code |= sub_0805EF8C(token);
+                    }
+                    break;
+                }
+#endif
                 code = sub_0805EF8C(token);
                 code |= 0x300;
                 break;
+#ifdef PC_PORT
+            case 0x10:
+            case 0x11:
+            case 0x12:
+            case 0x13:
+            case 0x14:
+            case 0x15:
+            case 0x16:
+            case 0x17:
+                /* EU Chinese translation: codes 0x10-0x17 select banks 9-16. */
+                if (Port_GetRomVariant() == ROM_VARIANT_EU_CHINESE) {
+                    code = (0x900 + (code - 0x10) * 0x100) | sub_0805EF8C(token);
+                    break;
+                }
+                code += 0x100;
+                break;
+#endif
             default:
                 code += 0x100;
                 break;
@@ -437,6 +516,13 @@ u32* sub_0805F25C(u32 param_1) {
 #endif
 
     uVar1 = param_1 >> 8 & 0xf;
+#ifdef PC_PORT
+    /* EU Chinese widens the bank nibble to 5 bits so the CJK glyph banks
+     * (9-16) survive the mask; retail and JP Chinese stay at 4 bits. */
+    if (Port_GetRomVariant() == ROM_VARIANT_EU_CHINESE) {
+        uVar1 = param_1 >> 8 & 0x1f;
+    }
+#endif
     param_1 = param_1 & 0xff;
     switch (uVar1) {
         case 0:
@@ -457,23 +543,30 @@ u32* sub_0805F25C(u32 param_1) {
             param_1 = param_1 << 1;
             break;
     }
-    {
 #ifdef PC_PORT
-        /* Bank nibble comes from the text stream (ROM/asset/mod data); the
-         * switch handles banks 0..8 and gUnk_08109248 has exactly 9 host
-         * entries. GBA read adjacent ROM for 9..15; on PC that's a garbage
-         * host pointer — clamp to bank 0. */
-        u32* result;
-        if (uVar1 >= 9) {
-            uVar1 = 0;
+    /* Variant glyph strides. The base switch above is the retail USA/EU table
+     * (banks 2-4 half/64-byte, 5-8 128-byte). JP banks 3-4 are 128-byte and
+     * JP banks 9-15 use the 16-entry fan table; EU Chinese banks 9-22 are
+     * 128-byte and banks up to 16 are valid. Clamp to the host entry count. */
+    if (REGION_IS_JP) {
+        if (uVar1 == 3 || uVar1 == 4 || uVar1 >= 9) {
+            param_1 = param_1 << 1;
         }
-        result = gUnk_08109248[uVar1] + param_1 * 0x10;
-        return result;
-#else
-        u32* result = gUnk_08109248[uVar1] + param_1 * 0x10;
-        return result;
-#endif
+        if (uVar1 > 8 && Port_GetRomVariant() != ROM_VARIANT_JP_CHINESE) {
+            uVar1 = 0; /* retail JP carries a 9-entry table */
+        }
+    } else if (Port_GetRomVariant() == ROM_VARIANT_EU_CHINESE) {
+        if (uVar1 >= 9) {
+            param_1 = param_1 << 1;
+        }
+        if (uVar1 > 16) {
+            uVar1 = 0; /* EU Chinese carries a 17-entry table */
+        }
+    } else if (uVar1 >= 9) {
+        uVar1 = 0; /* retail USA/EU: 9-entry table */
     }
+#endif
+    return gUnk_08109248[uVar1] + param_1 * 0x10;
 }
 
 WStruct* sub_0805F2C8(void) {
@@ -541,7 +634,13 @@ u32 GetFontStrWith(Token* param_1, u32 param_2) {
                 default:
                     if (uVar5 == 0) {
                         puVar2 = (u32*)sub_0805F25C(character);
+#ifdef PC_PORT
+                        /* Same full-width split as sub_0805F7DC: JP's 128-byte
+                         * glyphs start at bank 3, retail USA/EU at bank 5. */
+                        if ((character >> 8) > (REGION_IS_JP ? 2 : 4)) {
+#else
                         if (4 < character >> 8) {
+#endif
                             uVar3 = sub_0805F7A0(puVar2[0x10]);
                             uVar4 += (uVar3 >> 8);
                         }
@@ -828,7 +927,14 @@ u32 sub_0805F7DC(u32 r0, WStruct* r1) {
 
     offset = sub_0805F25C(r0);
     temp = r1->unk6;
+#ifdef PC_PORT
+    /* Full-width (16px) glyphs render as two 8px passes. Retail USA/EU split
+     * at bank 5; JP (retail and Chinese) uses 128-byte glyphs from bank 3, so
+     * the split follows the region's glyph layout. */
+    if ((r0 >> 8) > (REGION_IS_JP ? 2 : 4)) {
+#else
     if ((r0 >> 8) > 4) {
+#endif
         sub_0805F820(r1, offset);
         offset += 0x10;
     }

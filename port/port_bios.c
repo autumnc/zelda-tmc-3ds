@@ -3,6 +3,7 @@
 #include "main.h"
 #include "port_audio.h"
 #include "port_asset_loader.h"
+#include "port_cheats.h"
 #include "port_gba_mem.h"
 #include "port_hdma.h"
 #include "port_ppu.h"
@@ -739,6 +740,25 @@ int Port_Profile_Enabled(void) {
 
 void VBlankIntrWait(void) {
 #ifdef TMC_3DS
+    /* Cheat menu: while it is open the engine is held here — the game logic
+     * below cannot advance, but the display keeps presenting the frozen
+     * frame, the bottom screen keeps painting the list (BottomWorker), and
+     * the D-pad/A/B navigate the menu. Audio and lifecycle keep pumping. */
+    while (Port_CheatMenu_Active()) {
+        const bool present = Platform3DS_BeginFrameBoundary();
+        if (present) {
+            Port_PPU_SetPresentIsFirstOfTick(true);
+            Port_PPU_PresentFrame();
+        }
+        port_hdma_vblank_reset();
+        if (present) {
+            Platform3DS_WaitForVBlank();
+        } else {
+            Platform3DS_PumpWithoutVBlank();
+        }
+        Port_CheatMenu_HandleInput(Platform3DS_KeysDown(), Platform3DS_KeysHeld());
+    }
+
     const bool present = Platform3DS_BeginFrameBoundary();
     if (present) {
         Port_PPU_SetPresentIsFirstOfTick(true);
@@ -751,6 +771,7 @@ void VBlankIntrWait(void) {
         Platform3DS_PumpWithoutVBlank();
     }
     gba_write16(REG_ADDR_KEYINPUT, Platform3DS_ReadKeyInput());
+    Port_CheatMenu_ApplyFrame();
     {
         extern void Port_QuickSave_AutoTick(void);
         Port_QuickSave_AutoTick();

@@ -64,6 +64,7 @@
 
 #ifdef TMC_3DS
 #include "platform_3ds.h"
+#include "port_cheats.h"
 #include "port_dump_state_3ds.h"
 
 extern void Port_PPU_3DS_WriteQuickDump(void);
@@ -2328,6 +2329,115 @@ static void PaintRandomizerConfirmation(const SSurf* s, TargetList* tl, float u,
               layout.buttonBottom, SS_ACT_RANDO_CONFIRM,
               (uint8_t)(enable != 0));
 }
+
+/* Clip a cheat name so it never runs into the state chip on the right of a
+ * row: keep the longest prefix whose width fits. MenuTextWidth mirrors what
+ * MenuTextDraw renders, so the check matches the on-screen result. */
+static void FitCheatName(char* out, size_t outCap, const char* in, int32_t ms, float maxW) {
+    size_t n;
+    if (outCap < 1) return;
+    n = strlen(in);
+    if (n >= outCap) n = outCap - 1;
+    if (MenuTextWidth(in, ms) <= maxW) {
+        memcpy(out, in, n);
+        out[n] = '\0';
+        return;
+    }
+    size_t lo = 0, hi = n; /* lo always fits, hi never does */
+    while (lo + 1 < hi) {
+        size_t mid = (lo + hi) / 2;
+        char tmp[PORT_CHEAT_NAME_MAX + 1];
+        memcpy(tmp, in, mid);
+        tmp[mid] = '\0';
+        if (MenuTextWidth(tmp, ms) <= maxW) lo = mid;
+        else hi = mid;
+    }
+    memcpy(out, in, lo);
+    out[lo] = '\0';
+}
+
+/* Cheat menu: full-screen overlay listing everything parsed from
+ * cheats.txt. Rows are the settings-style button plates; the cursor row
+ * carries the gold keyline and the enabled state sits in a red/dark chip on
+ * the right. The list scrolls to keep the cursor in view. Strings stay in
+ * the stand-in face's glyph set (A-Z a-z 0-9 space - /), since on a JP ROM
+ * the decoded face is disabled and the 5x7 stand-in draws instead. */
+static void PaintCheatMenu(const SSurf* s, float u, int32_t ts) {
+    int count = Port_CheatMenu_GetCount();
+    float inset = 18 * u;
+    float x0 = inset, x1 = s->w - inset;
+    float y0 = inset, y1 = s->h - inset;
+    Port_SecondScreenTheme_DrawPlate(s->px, s->w, s->h, s->stride, (int32_t)x0, (int32_t)y0,
+                                     (int32_t)(x1 - x0), (int32_t)(y1 - y0), ts);
+
+    int32_t hms = (int32_t)(2.4f * u);
+    if (hms < 1) hms = 1;
+    float headerH = MENU_TEXT_BOX * hms + 24 * u;
+    DrawPanelHeaderChip(s, s->w / 2.0f, y0 + 2 * u, "CHEATS", hms, u);
+
+    if (count <= 0) {
+        int32_t ms = (int32_t)(1.8f * u);
+        if (ms < 1) ms = 1;
+        MenuTextCentered(s, "NO CHEATS FOUND", s->w / 2.0f, (y0 + y1) / 2 - 16 * u, ms, SS_TEXT_INK);
+        MenuTextCentered(s, "ADD A CHEATS.TXT", s->w / 2.0f, (y0 + y1) / 2 + 8 * u, ms, SS_TEXT_INK);
+        return;
+    }
+
+    int cursor = Port_CheatMenu_GetCursor();
+    if (cursor < 0) cursor = 0;
+    if (cursor >= count) cursor = count - 1;
+    int visible = count < 6 ? count : 6;
+    int first = cursor - visible / 2;
+    if (first < 0) first = 0;
+    if (first + visible > count) first = count - visible;
+
+    float rowsTop = y0 + headerH + 12 * u;
+    float footerY = y1 - 14 * u;
+    float rowsBottom = footerY - MENU_TEXT_BOX * (int32_t)(1.8f * u) - 16 * u;
+    float gap = 10 * u;
+    float rowH = (rowsBottom - rowsTop - (visible - 1) * gap) / visible;
+    if (rowH > 84 * u) rowH = 84 * u;
+    if (rowH < 24) rowH = 24;
+
+    for (int r = 0; r < visible; ++r) {
+        int idx = first + r;
+        const PortCheatDef* def = Port_CheatMenu_GetDef(idx);
+        float ry = rowsTop + r * (rowH + gap);
+        int isCursor = idx == cursor;
+        int enabled = Port_CheatMenu_IsEnabled(idx);
+
+        DrawMenuButton(s, x0, ry, x1, ry + rowH, "", 0, isCursor, u, ts);
+
+        int32_t ms = (int32_t)((rowH * 0.56f) / MENU_TEXT_BOX);
+        if (ms < 1) ms = 1;
+        int32_t maxMs = (int32_t)(1.8f * u);
+        if (maxMs < 1) maxMs = 1;
+        if (ms > maxMs) ms = maxMs;
+
+        const char* val = def->needValue ? "NEED VALUE" : (enabled ? "ON" : "OFF");
+        float ch = rowH - 10 * u;
+        if (ch < MENU_TEXT_BOX * ms) ch = MENU_TEXT_BOX * ms;
+        float cw = MenuTextWidth(val, ms) + 20 * u;
+        float cx1 = x1 - 10 * u, cx0 = cx1 - cw;
+        float cy0 = (ry + ry + rowH - ch) / 2;
+        int32_t cts = (int32_t)(ch / 24.0f);
+        if (cts < 1) cts = 1;
+        Port_SecondScreenTheme_DrawChip(s->px, s->w, s->h, s->stride, (int32_t)cx0, (int32_t)cy0,
+                                        (int32_t)cw, (int32_t)ch, cts,
+                                        enabled && !def->needValue ? SS_CHIP_RED : SS_CHIP_DARK);
+        MenuTextCentered(s, val, (cx0 + cx1) / 2, cy0 + ch / 2, ms, SS_TEXT_WHITE);
+
+        char name[PORT_CHEAT_NAME_MAX + 1];
+        FitCheatName(name, sizeof(name), def->name, ms, cx0 - 8 * u - (x0 + 18 * u));
+        MenuTextDraw(s, name, (int32_t)(x0 + 18 * u), (int32_t)(ry + rowH / 2 - 8 * ms), ms,
+                     isCursor ? SS_TEXT_NAVY : SS_TEXT_INK);
+    }
+
+    int32_t fms = (int32_t)(1.8f * u);
+    if (fms < 1) fms = 1;
+    MenuTextCentered(s, "D-PAD MOVE   A TOGGLE   L R SELECT CLOSE", s->w / 2.0f, footerY, fms,
+                     SS_TEXT_NAVY);
+}
 #endif
 
 int Port_SecondScreen_IsDeveloperOverlayOpen(void) {
@@ -2899,7 +3009,9 @@ void Port_SecondScreen_PaintInto(uint32_t* pixels, int width, int height, int st
     }
     PaintTabBar(&s, &tl, u, ts, tab);
 #ifdef TMC_3DS
-    if (loadConfirmActive) {
+    if (Port_CheatMenu_Active()) {
+        PaintCheatMenu(&s, u, ts);
+    } else if (loadConfirmActive) {
         PaintLoadStateConfirmation(&s, &tl, u, ts);
     } else if (randoConfirmActive) {
         PaintRandomizerConfirmation(&s, &tl, u, ts, randoDesired);
@@ -2953,6 +3065,11 @@ static int PickMapRegion(int x, int y) {
 
 
 void Port_SecondScreen_OnTap(int x, int y, int longPress) {
+#ifdef TMC_3DS
+    if (Port_CheatMenu_Active()) {
+        return; /* the cheat menu owns the screen; taps never reach the panel */
+    }
+#endif
     TapTarget hit;
     int found = 0;
 

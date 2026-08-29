@@ -1,9 +1,9 @@
 # JP (BZMJ) version support on the PC port
 
-*Status (2026-06-13): **booting and core-correct.** A JP build runs against the
-retail JP ROM with all data tables resolving correctly — verified by boot test.
-Remaining for full speedrun parity: Japanese text rendering and JP script-address
-tables (see "Remaining gaps").*
+*Status (2026-08-29): **booting, core-correct, and Chinese-text-faithful.** A JP
+build runs against the retail JP ROM with all data tables resolving correctly —
+verified by boot test. The BZMJ Chinese fan translation also renders Chinese text
+correctly, as does the BZMP (EU-base) Chinese fan translation (see below).*
 
 The Minish Cap speedrun scene runs the **Japanese** version (RNG manipulations are
 version-exclusive and were authored for JP). The decomp supports JP at the source
@@ -24,6 +24,34 @@ runtime, and supplies the JP ROM data-table offsets.
    Area data tables loaded (0x90 areas, 2-level pointers resolved).
    Entering AgbMain...
    ```
+
+### Chinese fan translations (JP- and EU-base)
+
+The port recognizes both known Chinese fan translations at runtime by ROM
+fingerprint:
+
+```text
+JP Chinese:  SHA-1 ba04cfbe93d12d2ad684c52234472fa12a5b53d7  (BZMJ)
+             SHA-256 f51c6c2f90e18ee91203dd767307271e06901b5bff35c3a567d52f61a39d166d
+EU Chinese:  SHA-1 9505d819eda125da13bc713334f17b5b9e8bc1ed  (BZMP)
+             SHA-256 15236fcb3e6be57d112eac7f0501c995fe1599368629a851a7ce14ee97aa21eb
+```
+
+Each patch keeps the retail header and core data tables at the retail offsets but
+repoints the text system to patched data later in the ROM:
+
+- **BZMJ (JP-base)** keeps the JP GetCharacter opcodes and glyph layout but points
+  the 16-entry font table at `0x08DC9F00` with 128-byte glyphs on banks 3-15.
+- **BZMP (EU-base)** extends the EU GetCharacter dispatch with character codes
+  `0x10-0x17` → glyph banks `0x0900-0x1000`, repoints the 17-entry font table at
+  `0x0810CE00`, and widens the glyph-lookup bank mask to `0x1F` (banks 0-4 at 64
+  bytes, 5-22 at 128 bytes).
+
+Runtime selection is per-ROM: `ROM_VARIANT_JP_CHINESE` / `ROM_VARIANT_EU_CHINESE`
+drive which GetCharacter, glyph-lookup, and font-table variants `src/text.c` and
+`port/port_rom.c` use. Every message in both ROMs was decoded and each glyph
+resolved through the patched font tables — all in-bounds (JP 2976, EU 2992 glyphs,
+0 out-of-range).
 
 ## What's wired (all committed, USA build unaffected)
 

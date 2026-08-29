@@ -2,6 +2,7 @@
 #include "old3ds_frame_pacer.h"
 #include "platform_gpu_3ds.h"
 #include "port_audio_3ds.h"
+#include "port_cheats.h"
 #include "port_second_screen_3ds.h"
 #include "port_second_screen_sync_3ds.h"
 
@@ -18,6 +19,7 @@ static circlePosition sCStickPosition;
 static bool sCStickHeld;
 static bool sQuickDumpRequested;
 static bool sQuickDumpComboWasHeld;
+static bool sCheatComboWasHeld;
 static bool sRunning;
 static bool sIsNew3DS;
 static unsigned sTurboMultiplier = 5;
@@ -98,6 +100,7 @@ int Platform3DS_Init(void) {
     sCStickHeld = false;
     sQuickDumpRequested = false;
     sQuickDumpComboWasHeld = false;
+    sCheatComboWasHeld = false;
     sCore1Available = false;
     sCore1TimeLimit = 0;
     sSpeedupRequested = false;
@@ -261,6 +264,12 @@ static uint16_t MapKeysToGba(uint32_t keys) {
     if (keys & (KEY_DDOWN | KEY_CPAD_DOWN)) input &= ~GBA_DOWN;
     if ((keys & KEY_R) && !quickDumpCombo) input &= ~GBA_R;
     if ((keys & KEY_L) && !quickDumpCombo) input &= ~GBA_L;
+    /* While the cheat menu is open the game is frozen; still force its
+     * controls released so nothing leaks through to the engine. */
+    if (Port_CheatMenu_Active()) {
+        input |= (GBA_A | GBA_B | GBA_SELECT | GBA_START | GBA_RIGHT | GBA_LEFT | GBA_UP | GBA_DOWN |
+                  GBA_R | GBA_L);
+    }
     return input;
 }
 
@@ -269,6 +278,10 @@ uint16_t Platform3DS_ReadKeyDownInput(void) { return MapKeysToGba(sDown); }
 
 uint32_t Platform3DS_KeysHeld(void) {
     return sHeld;
+}
+
+uint32_t Platform3DS_KeysDown(void) {
+    return sDown;
 }
 
 void Platform3DS_ReadCircle(float* x, float* y) {
@@ -534,7 +547,16 @@ static void PollInput(void) {
         hidTouchRead(&touch);
         Port_SecondScreen_3DS_OnTap(touch.px, touch.py, 0);
     }
-    const bool quickDumpCombo = (sHeld & (KEY_L | KEY_R | KEY_A)) == (KEY_L | KEY_R | KEY_A);
+    const bool cheatCombo = (sHeld & (KEY_L | KEY_R | KEY_SELECT)) == (KEY_L | KEY_R | KEY_SELECT);
+    if (cheatCombo && !sCheatComboWasHeld) {
+        Port_CheatMenu_ToggleOpen();
+        /* Opening pauses the engine in VBlankIntrWait; force one bottom paint
+         * so the menu appears immediately instead of on the periodic cadence. */
+        Port_SecondScreen_3DS_RequestRefresh();
+    }
+    sCheatComboWasHeld = cheatCombo;
+    const bool quickDumpCombo = !Port_CheatMenu_Active() &&
+                                (sHeld & (KEY_L | KEY_R | KEY_A)) == (KEY_L | KEY_R | KEY_A);
     if (quickDumpCombo && !sQuickDumpComboWasHeld) sQuickDumpRequested = true;
     sQuickDumpComboWasHeld = quickDumpCombo;
 }

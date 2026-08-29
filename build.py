@@ -26,17 +26,24 @@ def _read_sha1_file(filename: str) -> Optional[str]:
         return p.read_text().split()[0]
     return None
 
+def _hash_list(*values: Optional[str]) -> list[str]:
+    return [v for v in values if v]
+
 VERSIONS = {
     "USA": {
         "rom_filename": "baserom.gba",
         "sha1":         _read_sha1_file("tmc.sha1"),
         "sha256":       _read_sha1_file("tmc.sha256"),
+        "sha1_aliases":  [],
+        "sha256_aliases": [],
         "game_version": "USA",
     },
     "EU": {
         "rom_filename": "baserom_eu.gba",
         "sha1":         _read_sha1_file("tmc_eu.sha1"),
         "sha256":       _read_sha1_file("tmc_eu.sha256"),
+        "sha1_aliases":  [],
+        "sha256_aliases": [],
         "game_version": "EU",
     },
     # JP is ROM-gated: needs a legal BZMJ baserom (tmc_jp.gba, sha1 in
@@ -47,13 +54,20 @@ VERSIONS = {
         "rom_filename": "baserom_jp.gba",
         "sha1":         _read_sha1_file("tmc_jp.sha1"),
         "sha256":       _read_sha1_file("tmc_jp.sha256"),
+        # Known BZMJ-based Chinese fan translation. It keeps the retail JP
+        # header and core data layout, but moves the JP text table to ROM
+        # space added by the patch. Treat it as a JP ROM for build/runtime
+        # selection while preserving the clean JP hash as the canonical one.
+        "sha1_aliases":  ["ba04cfbe93d12d2ad684c52234472fa12a5b53d7"],
+        "sha256_aliases": ["f51c6c2f90e18ee91203dd767307271e06901b5bff35c3a567d52f61a39d166d"],
         "game_version": "JP",
     },
 }
 
-SHA1_TO_VERSION = {
-    v["sha1"]: k for k, v in VERSIONS.items() if v["sha1"]
-}
+SHA1_TO_VERSION = {}
+for _version, _meta in VERSIONS.items():
+    for _digest in _hash_list(_meta.get("sha1"), *_meta.get("sha1_aliases", [])):
+        SHA1_TO_VERSION[_digest] = _version
 
 # ── UI helpers ────────────────────────────────────────────────────────────────
 
@@ -114,6 +128,28 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+def rom_matches_meta(path: Path, meta: dict) -> bool:
+    expected_sha1s = _hash_list(meta.get("sha1"), *meta.get("sha1_aliases", []))
+    if not expected_sha1s:
+        return True
+
+    try:
+        actual_sha1 = sha1_file(path)
+    except OSError:
+        return False
+    if actual_sha1 not in expected_sha1s:
+        return False
+
+    expected_sha256s = _hash_list(meta.get("sha256"), *meta.get("sha256_aliases", []))
+    if expected_sha256s:
+        try:
+            actual_sha256 = sha256_file(path)
+        except OSError:
+            return False
+        if actual_sha256 not in expected_sha256s:
+            return False
+    return True
 
 def dir_populated(d: Path) -> bool:
     try:
@@ -360,10 +396,8 @@ def ensure_roms(selected: list, found: dict, non_interactive: bool = False) -> d
         meta   = VERSIONS[v]
         target = REPO_ROOT / meta["rom_filename"]
         sha1   = meta["sha1"]
-        sha256 = meta.get("sha256")
 
-        if (target.exists() and sha1 and sha1_file(target) == sha1
-                and (not sha256 or sha256_file(target) == sha256)):
+        if target.exists() and rom_matches_meta(target, meta):
             ok(f"{v}: {target.name}")
             result[v] = True
             continue

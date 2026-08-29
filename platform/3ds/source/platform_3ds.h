@@ -79,6 +79,7 @@ void Platform3DS_EnterGameplayDisplay(void);
 uint16_t Platform3DS_ReadKeyInput(void);
 uint16_t Platform3DS_ReadKeyDownInput(void);
 uint32_t Platform3DS_KeysHeld(void);
+uint32_t Platform3DS_KeysDown(void);
 void Platform3DS_ReadCircle(float* x, float* y);
 uint16_t* Platform3DS_GetFramebuffer(int top, uint16_t* width, uint16_t* height);
 uint64_t Platform3DS_Milliseconds(void);

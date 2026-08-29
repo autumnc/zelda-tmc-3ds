@@ -449,6 +449,11 @@ void Port_PrintRomAccessSummary(void) {
 /*  ROM region detection & offset tables (USA / EU)                   */
 /* ------------------------------------------------------------------ */
 RomRegion gRomRegion = ROM_REGION_UNKNOWN;
+static RomVariant gRomVariant = ROM_VARIANT_REGULAR;
+
+RomVariant Port_GetRomVariant(void) {
+    return gRomVariant;
+}
 
 #if defined(PC_PORT) && defined(MULTI_REGION)
 /* Runtime region identity read by the REGION_IS_* macros in region.h. Defaults
@@ -618,9 +623,9 @@ const RomOffsets kRomOffsets_JP = {
     .extraFrameOffsets = 0,
     .fixedTypeGfx = 0x13275C,
     .spritePtrs = 0x29B4,
-    .collisionMatrix = 0,
-    .collisionShapePtrs = 0,
-    .tileTypeProperties = 0,
+    .collisionMatrix = 0x0B7914, /* gCollisionMtx — JP arm_CalcCollision literal 0x080B7914; content 99.3% identical to EU's */
+    .collisionShapePtrs = 0x823C, /* JP collision-shape ptr table — content-verified: all 40 bitmap targets identical to EU's (EU table at 0x82D4, JP bitmaps sit 0x98 earlier) */
+    .tileTypeProperties = 0x360, /* JP tile-type property table — content-verified identical to EU's (EU moved it to 0x3A8 because its startup pointer block is larger) */
     .figurines = 0,
     .fuserEnemyData = 0,
     .fuserNpcData = 0,
@@ -735,6 +740,22 @@ RomRegion Port_DetectRomRegion(const u8* romData, u32 romSize) {
         fprintf(stderr, "WARNING: Unknown ROM game code '%.4s'. Defaulting to USA offsets.\n", &romData[0xAC]);
         gRomRegion = ROM_REGION_USA;
         gRomOffsets = &kRomOffsets_USA;
+    }
+
+    /* Chinese fan-translation variant detection. The BZMJ/BZMP Chinese patches
+     * keep the region game code and retail offsets but relocate the glyph
+     * lookup's font-bank-table base literal into the patch's own data region.
+     * Fingerprint that literal — one u32 read, no full-ROM SHA-1. Retail keeps
+     * the retail font-table address (JP 0x08108F0C / EU 0x0810899C) here. */
+    gRomVariant = ROM_VARIANT_REGULAR;
+    if (gRomRegion == ROM_REGION_JP && romSize >= 0x5F108 &&
+        Port_ReadU32(romData + 0x5F104) == 0x08DC9F00u) {
+        gRomVariant = ROM_VARIANT_JP_CHINESE;
+        fprintf(stderr, "ROM variant: JP Chinese fan translation (font table @0x08DC9F00).\n");
+    } else if (gRomRegion == ROM_REGION_EU && romSize >= 0x5ED50 &&
+        Port_ReadU32(romData + 0x5ED4C) == 0x0810CE00u) {
+        gRomVariant = ROM_VARIANT_EU_CHINESE;
+        fprintf(stderr, "ROM variant: EU Chinese fan translation (font table @0x0810CE00).\n");
     }
 #if defined(PC_PORT) && defined(MULTI_REGION)
     /* Fat binary: publish the detected region to the runtime REGION_IS_* macros
@@ -1542,8 +1563,10 @@ void Port_LoadRom(const char* path) {
     if (!romLoaded) {
         Port_FatalRomError("Minish Cap PC Port - ROM not found",
                            "Could not load baserom.gba.\n\n"
-                           "Place baserom.gba (USA) or baserom_eu.gba (EU) next to tmc_pc and try again.\n"
-                           "Supported names: baserom.gba, baserom_eu.gba, tmc.gba, tmc_eu.gba.");
+                           "Place baserom.gba (USA), baserom_eu.gba (EU), or baserom_jp.gba (JP) next to "
+                           "tmc_pc and try again.\n"
+                           "Supported names: baserom.gba, baserom_eu.gba, baserom_jp.gba, tmc.gba, "
+                           "tmc_eu.gba, tmc_jp.gba.");
     }
 
     if (!gRomData || gRomSize == 0) {
@@ -1804,11 +1827,25 @@ void Port_LoadRom(const char* path) {
     }
 #endif
 
-    /* gUnk_08109248 — resolved from active ROM */
-    for (int i = 0; i < 9; i++) {
-        gUnk_08109248[i] = Port_UnpackRomDataPtr(&gRomData[R->text09248], i);
+    /* gUnk_08109248 — resolved from active ROM. Retail ROMs carry 9 font
+     * table pointers; the Chinese fan translations repoint the font base and
+     * append their own glyph banks, so those variants load the patched table. */
+    if (gRomVariant == ROM_VARIANT_JP_CHINESE) {
+        for (int i = 0; i < 16; i++) {
+            gUnk_08109248[i] = Port_ResolveRomData(Port_ReadU32(&gRomData[0xDC9F00 + i * 4]));
+        }
+        fprintf(stderr, "gUnk_08109248 font tables loaded (16 entries, JP Chinese @0xDC9F00).\n");
+    } else if (gRomVariant == ROM_VARIANT_EU_CHINESE) {
+        for (int i = 0; i < 17; i++) {
+            gUnk_08109248[i] = Port_ResolveRomData(Port_ReadU32(&gRomData[0x10CE00 + i * 4]));
+        }
+        fprintf(stderr, "gUnk_08109248 font tables loaded (17 entries, EU Chinese @0x10CE00).\n");
+    } else {
+        for (int i = 0; i < 9; i++) {
+            gUnk_08109248[i] = Port_UnpackRomDataPtr(&gRomData[R->text09248], i);
+        }
+        fprintf(stderr, "gUnk_08109248 font tables loaded (9 entries from active ROM).\n");
     }
-    fprintf(stderr, "gUnk_08109248 font tables loaded (9 entries from active ROM).\n");
 
     /* gUnk_081092AC — resolved from active ROM */
     for (int i = 0; i < 10; i++) {

@@ -243,13 +243,15 @@ void Port_SecondScreenTheme_DrawChip(uint32_t* pixels, int32_t bufW, int32_t buf
 
 /* Text in the game's message font (gUnk_08109248 bank 0, per-glyph widths
  * from the metrics rows), colored through the game's own text LUTs
- * (SS_TEXT_*). Returns the advance in pixels, or 0 when the font is not
- * decoded yet (callers keep a procedural fallback). y is the glyph-box
- * top; visible ink spans rows 1..15 of the 16 px box. */
+ * (SS_TEXT_*). Returns the advance in pixels. When the ROM's bank 0 is a
+ * non-latin script (retail JP kana, or the CJK banks a Chinese fan
+ * translation installs), the procedural 5x7 caps face draws instead, so a
+ * panel never shows mojibake; 0 is returned only before the theme decodes.
+ * y is the glyph-box top; visible ink spans rows 1..15 of the 16 px box. */
 int32_t Port_SecondScreenTheme_DrawText(uint32_t* pixels, int32_t bufW, int32_t bufH, int32_t stride,
                                         int32_t x, int32_t y, int32_t scale, int style, const char* str);
 
-/* Pixel width DrawText would advance (0 when the font is not ready). */
+/* Pixel width DrawText would advance (0 only before the theme decodes). */
 int32_t Port_SecondScreenTheme_TextWidth(const char* str, int32_t scale);
 
 /* Text in the game's STYLIZED banner font — the fat white-on-navy
@@ -271,7 +273,9 @@ int32_t Port_SecondScreenTheme_BigTextWidth(const char* str, int32_t scale);
  * keyline and blue lettering the SLEEP / SAVE buttons use. Draws the frame
  * fitted to the rect and the label centered in the game's button font.
  * `pressed` draws the button's own active/held state. Returns 1 when the
- * authentic art was used, 0 while it isn't decoded (caller falls back). */
+ * authentic art was used, 0 while it isn't decoded or the label's stylized
+ * bank is a non-latin script (caller falls back to its procedural plate +
+ * 5x7 label). */
 int Port_SecondScreenTheme_DrawMenuButton(uint32_t* pixels, int32_t bufW, int32_t bufH, int32_t stride,
                                           int32_t x, int32_t y, int32_t w, int32_t h, const char* label,
                                           int pressed);

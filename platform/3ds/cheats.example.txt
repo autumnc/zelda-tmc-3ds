@@ -1,0 +1,116 @@
+# Optional cheats.txt override for The Minish Cap 3DS
+#
+# The build already ships this exact list compiled in, so no file is required.
+# Copy this file to the app folder (same folder as the ROM) and rename it
+# cheats.txt ONLY to replace the built-in list with your own codes:
+#
+#   sdmc:/3ds/The Minish Cap 3DS/cheats.txt
+#
+# Press L + R + SELECT in-game to open the cheat menu. Names must be ASCII:
+# on a JP-ROM build the CJK font is disabled, so the menu cannot render
+# non-ASCII characters.
+#
+# Addresses are the stock VBA/GameShark GBA codes; the port re-bases them onto
+# the game's relocated state automatically, so use the addresses as-is.
+#
+# Format:
+#   name ADDR:VALUE   starts a cheat (8-hex address, value 2/4/8 hex digits
+#                     = 1/2/4 bytes)
+#   ADDR:VALUE        adds another write to the current cheat
+#   # comment / blank lines are ignored
+
+# HP
+HP 02002AEA:A0
+
+# Max HP
+Max HP 02002AEB:A0
+
+# Rupees
+Rupees 02002B00:03E7
+
+# Rupees cap
+Rupees Max 02002AE8:03
+
+# All sword techniques
+All Sword Skills 0300402C:FFFF
+
+# All scrolls
+All Scrolls 02002B44:FFFF
+
+# Bomb / arrow / shell counts
+Bomb Count 02002AEC:63
+Arrow Count 02002AED:63
+Shell Count 02002B02:03E7
+
+# Key count
+Key Count
+02002E9D:63
+02002E9E:6363
+02002EA0:63636363
+02002EA4:63636363
+02002EA8:63636363
+02002EAC:63
+
+# Dungeon helper items
+Dungeon Items
+02002EAD:07
+02002EAE:0707
+02002EB0:07070707
+02002EB4:07070707
+02002EB8:07070707
+02002EBC:07
+
+# Items with placeholder values: the menu shows NEED VALUE and toggling is
+# skipped until you edit the xx below (see the value table at the end).
+A-Button Item 02002AF4:xx
+B-Button Item 02002AF5:xx
+Sword Type 02002B32:xx
+
+# Some weapons at once (watch for side effects)
+Partial Items (Careful) 02002B34:45545115
+
+# Body size. Value table:
+# 00 Big
+# 80 Small
+Body Size 03003FB0:xx
+
+# Full map
+Full Map
+02002A80:FFFF
+02002A82:01
+
+# All figurines
+All Figurines
+02002B0E:FFFF
+02002B10:FFFFFFFF
+02002B14:FFFFFFFF
+02002B18:FFFFFFFF
+02002B1C:FFFF
+02002B1E:FF
+
+# A-Button Item / B-Button Item / Sword Type value table (edit the xx above):
+# 00 None
+# 01 Smith's Sword
+# 02 White Sword
+# 03 White Sword (2 shadows)
+# 04 White Sword (3 shadows)
+# 05 ... (Lamp)
+# 06 Four Sword
+# 07 Bomb
+# 08 Remote Bomb
+# 09 Bow & Arrow
+# 0A Light Bow & Arrow
+# 0B Boomerang
+# 0C Magical Boomerang
+# 0D Small Shield
+# 0E Mirror Shield
+# 0F Flame Lantern
+# 10 Lamp
+# 11 Magic Jar
+# 12 Patti's Staff
+# 13 Mole Mitts
+# 14 Roc's Cape
+# 15 Pegasus Boots
+# 16 Magic Wand
+# 17 Wind Ocarina
+# 1C Empty Bottle

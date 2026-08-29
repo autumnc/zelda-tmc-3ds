@@ -48,6 +48,7 @@ static int sRandoTunicColor;
 static int sRandoHeartColor;
 static int sRandoTricks;
 static int sRandoAccessibility;
+static _Atomic uint32_t sCheatEnabledMask;
 static bool sConfigLoaded;
 static char sConfigPath[256] = "tmc3ds.ini";
 
@@ -98,6 +99,7 @@ static void SaveConfig(void) {
     fprintf(file, "rando_heart_color=%d\n", sRandoHeartColor);
     fprintf(file, "rando_tricks=%d\n", sRandoTricks);
     fprintf(file, "rando_accessibility=%d\n", sRandoAccessibility);
+    fprintf(file, "cheat_enabled=%08x\n", (unsigned)sCheatEnabledMask);
 
     /* A synchronous SD flush can stall the 3DS main thread for seconds on
      * every Settings change. The temporary file plus close/rename/backup
@@ -170,6 +172,7 @@ void Port_Config_Load(const char* path) {
             else if (strcmp(key, "rando_heart_color") == 0) sRandoHeartColor = (int)strtol(value, NULL, 10);
             else if (strcmp(key, "rando_tricks") == 0) sRandoTricks = (int)strtol(value, NULL, 10);
             else if (strcmp(key, "rando_accessibility") == 0) sRandoAccessibility = (int)strtol(value, NULL, 10);
+            else if (strcmp(key, "cheat_enabled") == 0) sCheatEnabledMask = (uint32_t)strtoul(value, NULL, 16);
         }
         fclose(file);
     }
@@ -341,6 +344,8 @@ int Port_Config_GetRandoTricks(void) { return sRandoTricks; }
 void Port_Config_SetRandoTricks(int tricks) { sRandoTricks = tricks; SaveConfig(); }
 int Port_Config_GetRandoAccessibility(void) { return sRandoAccessibility; }
 void Port_Config_SetRandoAccessibility(int accessibility) { sRandoAccessibility = accessibility; SaveConfig(); }
+uint32_t Port_Config_GetCheatEnabledMask(void) { return sCheatEnabledMask; }
+void Port_Config_SetCheatEnabledMask(uint32_t mask) { sCheatEnabledMask = mask; SaveConfig(); }
 void Port_Config_OpenGamepads(void) {}
 void Port_Config_CloseGamepads(void) {}
 

@@ -1,6 +1,7 @@
 #include "platform_3ds.h"
 
 #include "port_audio.h"
+#include "port_cheats.h"
 #include "port_ppu.h"
 #include "port_rom.h"
 #include "port_runtime_config.h"
@@ -39,7 +40,8 @@ static int RomIsSupported(const char* path) {
     FILE* file = fopen(path, "rb");
     if (!file) return 0;
     int ok = fseek(file, 0xAC, SEEK_SET) == 0 && fread(gameCode, 1, sizeof(gameCode), file) == sizeof(gameCode) &&
-             (memcmp(gameCode, "BZME", sizeof(gameCode)) == 0 || memcmp(gameCode, "BZMP", sizeof(gameCode)) == 0);
+             (memcmp(gameCode, "BZME", sizeof(gameCode)) == 0 || memcmp(gameCode, "BZMP", sizeof(gameCode)) == 0 ||
+              memcmp(gameCode, "BZMJ", sizeof(gameCode)) == 0);
     fclose(file);
     return ok;
 }
@@ -94,15 +96,17 @@ int main(int argc, char** argv) {
         if (romResult < 0) {
             snprintf(message, sizeof(message),
                      "None of the .gba files in:\n%s\n"
-                     "is a supported USA (BZME) or Europe (BZMP) ROM.\n\n"
+                     "is a supported USA (BZME), Europe (BZMP), or JP (BZMJ) ROM.\n\n"
                      "Expected SHA-1:\nUSA: b4bd50e4131b027c334547b4524e2dbbd4227130\n"
-                     "Europe: cff199b36ff173fb6faf152653d1bccf87c26fb7",
+                     "Europe: cff199b36ff173fb6faf152653d1bccf87c26fb7\n"
+                     "JP: 6c5404a1effb17f481f352181d0f1c61a2765c5d",
                      APP_DIR);
         } else {
             snprintf(message, sizeof(message),
-                     "Copy your clean USA or Europe ROM to:\n%s\n\nAny .gba filename is accepted.\n\n"
+                     "Copy your clean USA, Europe, or JP ROM to:\n%s\n\nAny .gba filename is accepted.\n\n"
                      "Expected SHA-1:\nUSA: b4bd50e4131b027c334547b4524e2dbbd4227130\n"
-                     "Europe: cff199b36ff173fb6faf152653d1bccf87c26fb7",
+                     "Europe: cff199b36ff173fb6faf152653d1bccf87c26fb7\n"
+                     "JP: 6c5404a1effb17f481f352181d0f1c61a2765c5d",
                      APP_DIR);
         }
         Platform3DS_ShowFatal(romResult < 0 ? "Unsupported ROM" : "ROM not found", message);
@@ -121,6 +125,16 @@ int main(int argc, char** argv) {
     printf("Loading ROM and tables...\n");
     Port_Config_Load("tmc3ds.ini");
     Port_LoadRom(romPath);
+    {
+        /* The built-in cheat list always ships, so L+R+SELECT works out of
+         * the box. An optional "cheats.txt" next to the ROM (CWD is the app
+         * folder) replaces it for power users. The enabled mask was already
+         * loaded from tmc3ds.ini. */
+        Port_CheatMenu_LoadBuiltIn();
+        const int cheats = Port_CheatMenu_LoadFile("cheats.txt");
+        if (cheats > 0) printf("%d cheats loaded from cheats.txt\n", cheats);
+        else printf("%d built-in cheats loaded\n", Port_CheatMenu_GetCount());
+    }
     Port_PPU_Init(NULL);
     if (!Port_Audio_Init()) {
         printf("Warning: audio is unavailable.\n");

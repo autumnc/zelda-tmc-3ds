@@ -1025,17 +1025,19 @@ static void BuildMenuTheme(void) {
     }
 
     /* Message font: glyph bank 0 plus the style LUT pairs. Bank 0 is
-     * the latin/ASCII face on USA and EU (sub_0805F25C routes plain A-Z
-     * there for every EU language); the JP ROM's bank 0 is its own script,
-     * so JP keeps the procedural label fallback instead of mojibake. */
+     * the latin/ASCII face on retail USA and EU (sub_0805F25C routes plain
+     * A-Z there for every EU language); the JP ROM's bank 0 is its own
+     * script, and the Chinese fan translations install a CJK bank 0, so
+     * those keep the procedural 5x7 label fallback instead of mojibake. */
     {
         static const u8 kStyleFill[SS_TEXT_STYLE_COUNT] = { 7, 5, 5, 5, 7 };
         static const u8 kStyleColor[SS_TEXT_STYLE_COUNT] = { 0, 0, 1, 2, 0 };
+        const int asciiFace = !REGION_IS_JP && Port_GetRomVariant() == ROM_VARIANT_REGULAR;
         sFontGlyphs = (const u8*)gUnk_08109248[0];
         for (i = 0; i < SS_TEXT_STYLE_COUNT; i++) {
             memcpy(sTextLut[i], TextLutPtr(kStyleFill[i], kStyleColor[i]), 32);
         }
-        sFontOk = sFontGlyphs != NULL && !REGION_IS_JP;
+        sFontOk = sFontGlyphs != NULL && asciiFace;
     }
 
     /* Stylized banner font (bank 8) + its per-style color tables. The
@@ -1069,7 +1071,7 @@ static void BuildMenuTheme(void) {
             sBigPal[SS_TEXT_NAVY][11] = bank1[2];
         sColors[SSC_BANNER_NAVY] = bank1[1];
         sBigFontGlyphs = (const u8*)gUnk_08109248[8];
-        sBigFontOk = sBigFontGlyphs != NULL && !REGION_IS_JP;
+        sBigFontOk = sBigFontGlyphs != NULL && !REGION_IS_JP && Port_GetRomVariant() == ROM_VARIANT_REGULAR;
     }
 }
 
@@ -1845,6 +1847,126 @@ static void GlyphMetrics(const u8* glyph, int32_t* outStart, int32_t* outWidth) 
     *outWidth = i - j;
 }
 
+/* Procedural 5x7 caps face for the ROMs with no latin in glyph bank 0:
+ * retail JP (kana) and the CJK banks a Chinese fan translation installs,
+ * where indexing the bank by ASCII code would print mojibake. Mirrors the
+ * label stand-in in port_second_screen.c; keep the two tables identical.
+ * One byte per row, bit 4 = leftmost column. */
+static const uint8_t kFallbackFont5x7[][7] = {
+    { 0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E }, /* 0 */
+    { 0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E }, /* 1 */
+    { 0x0E, 0x11, 0x01, 0x06, 0x08, 0x10, 0x1F }, /* 2 */
+    { 0x1F, 0x02, 0x04, 0x02, 0x01, 0x11, 0x0E }, /* 3 */
+    { 0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02 }, /* 4 */
+    { 0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E }, /* 5 */
+    { 0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E }, /* 6 */
+    { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08 }, /* 7 */
+    { 0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E }, /* 8 */
+    { 0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C }, /* 9 */
+    { 0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 }, /* A */
+    { 0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E }, /* B */
+    { 0x0E, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0E }, /* C */
+    { 0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E }, /* D */
+    { 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F }, /* E */
+    { 0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10 }, /* F */
+    { 0x0E, 0x11, 0x10, 0x13, 0x11, 0x11, 0x0F }, /* G */
+    { 0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11 }, /* H */
+    { 0x0E, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0E }, /* I */
+    { 0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0C }, /* J */
+    { 0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11 }, /* K */
+    { 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F }, /* L */
+    { 0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11 }, /* M */
+    { 0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11 }, /* N */
+    { 0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E }, /* O */
+    { 0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10 }, /* P */
+    { 0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D }, /* Q */
+    { 0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11 }, /* R */
+    { 0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E }, /* S */
+    { 0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 }, /* T */
+    { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E }, /* U */
+    { 0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04 }, /* V */
+    { 0x11, 0x11, 0x11, 0x15, 0x15, 0x1B, 0x11 }, /* W */
+    { 0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11 }, /* X */
+    { 0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04 }, /* Y */
+    { 0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F }, /* Z */
+    { 0x00, 0x00, 0x00, 0x0E, 0x00, 0x00, 0x00 }, /* - */
+    { 0x01, 0x01, 0x02, 0x04, 0x08, 0x10, 0x10 }, /* / */
+};
+
+static int FallbackGlyphIndex(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'A' && c <= 'Z') return 10 + (c - 'A');
+    if (c >= 'a' && c <= 'z') return 10 + (c - 'a'); /* fold: no lowercase face */
+    if (c == '-') return 36;
+    if (c == '/') return 37;
+    return -1; /* space and anything unknown: advance only */
+}
+
+static void PlotFallbackGlyph(uint32_t* pixels, int32_t bufW, int32_t bufH, int32_t stride, int32_t x,
+                              int32_t y, int32_t scale, char c, uint32_t color) {
+    int gi = FallbackGlyphIndex(c);
+    int32_t px, py, ex, ey;
+    if (gi < 0) {
+        return;
+    }
+    for (py = 0; py < 7; py++) {
+        uint8_t bits = kFallbackFont5x7[gi][py];
+        for (px = 0; px < 5; px++) {
+            if ((bits & (0x10u >> px)) == 0) {
+                continue;
+            }
+            for (ey = 0; ey < scale; ey++) {
+                int32_t dy = y + py * scale + ey;
+                if (dy < 0 || dy >= bufH) {
+                    continue;
+                }
+                for (ex = 0; ex < scale; ex++) {
+                    int32_t dx = x + px * scale + ex;
+                    if (dx >= 0 && dx < bufW) {
+                        pixels[(size_t)dy * (size_t)stride + dx] = color;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* 5x7 text in the label convention: 8-neighbor outline underneath, fill on
+ * top, 6*scale advance per char. */
+static int32_t DrawFallbackText(uint32_t* pixels, int32_t bufW, int32_t bufH, int32_t stride, int32_t x,
+                                int32_t y, int32_t scale, uint32_t color, uint32_t outline,
+                                const char* str) {
+    int32_t startX = x;
+    int32_t ox, oy;
+    if (scale < 1) {
+        scale = 1;
+    }
+    for (const char* p = str; *p; p++) {
+        for (oy = -1; oy <= 1; oy++) {
+            for (ox = -1; ox <= 1; ox++) {
+                if (ox || oy) {
+                    PlotFallbackGlyph(pixels, bufW, bufH, stride, x + ox * scale, y + oy * scale, scale,
+                                      *p, outline);
+                }
+            }
+        }
+        PlotFallbackGlyph(pixels, bufW, bufH, stride, x, y, scale, *p, color);
+        x += 6 * scale;
+    }
+    return x - startX;
+}
+
+static int32_t FallbackTextWidth(const char* str, int32_t scale) {
+    int32_t n = 0;
+    if (scale < 1) {
+        scale = 1;
+    }
+    for (const char* p = str; *p; p++) {
+        n++;
+    }
+    return n * 6 * scale;
+}
+
 /* The USA/EU script is plain ASCII in bank 0 (charmap.txt); anything the
  * panel never uses falls back to '?' so a stray string cannot index out
  * of the 256-glyph bank. */
@@ -1858,8 +1980,11 @@ static const u8* GlyphData(char c) {
 
 int32_t Port_SecondScreenTheme_TextWidth(const char* str, int32_t scale) {
     int32_t w = 0, gs, gw;
-    if (!sBuilt || !sFontOk || str == NULL) {
+    if (!sBuilt || str == NULL) {
         return 0;
+    }
+    if (!sFontOk) {
+        return FallbackTextWidth(str, scale);
     }
     for (; *str; str++) {
         GlyphMetrics(GlyphData(*str), &gs, &gw);
@@ -1873,7 +1998,7 @@ int32_t Port_SecondScreenTheme_DrawText(uint32_t* pixels, int32_t bufW, int32_t 
     const u8* lutE;
     const u8* lutO;
     int32_t startX = x;
-    if (!sBuilt || !sFontOk || str == NULL) {
+    if (!sBuilt || str == NULL) {
         return 0;
     }
     if (style < 0 || style >= SS_TEXT_STYLE_COUNT) {
@@ -1881,6 +2006,17 @@ int32_t Port_SecondScreenTheme_DrawText(uint32_t* pixels, int32_t bufW, int32_t 
     }
     if (scale < 1) {
         scale = 1;
+    }
+    if (!sFontOk) {
+        /* Same role mapping and outline scheme as the label fallback so the
+         * 5x7 counts read like the rest of a JP/CJK panel. */
+        static const int kColorId[SS_TEXT_STYLE_COUNT] = { SSC_MENU_INK, SSC_MENU_WHITE, SSC_MENU_RED,
+                                                           SSC_RUPEE_GREEN, SSC_BANNER_NAVY };
+        uint32_t color = Port_SecondScreenTheme_Color(kColorId[style]);
+        uint32_t outline = (style == SS_TEXT_INK || style == SS_TEXT_NAVY)
+                               ? Port_SecondScreenTheme_Color(SSC_MENU_CREAM)
+                               : Port_SecondScreenTheme_Color(SSC_MENU_BLACK);
+        return DrawFallbackText(pixels, bufW, bufH, stride, x, y, scale, color, outline, str);
     }
     lutE = &sTextLut[style][0];
     lutO = &sTextLut[style][16];
@@ -2111,6 +2247,13 @@ int Port_SecondScreenTheme_DrawMenuButton(uint32_t* pixels, int32_t bufW, int32_
     int32_t ls, textW = 0, tx, ty;
 
     if (!sBuilt || !sBtnOk || pixels == NULL || w <= 0 || h <= 0) {
+        return 0;
+    }
+
+    /* A non-empty label is lettered in the stylized bank; on JP/CJK that
+     * bank holds the wrong script, so hand the caller its procedural plate
+     * + 5x7 label rather than an unlettered button. */
+    if (label != NULL && label[0] != '\0' && !sBigFontOk) {
         return 0;
     }
 
